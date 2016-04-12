@@ -1,4 +1,4 @@
-package main.java.com.silly_diff.Util
+package com.silly_diff.Util
 
 import groovy.sql.GroovyRowResult
 import groovy.sql.Sql
@@ -15,6 +15,44 @@ import java.util.regex.*
 
 @Slf4j
 class SqlUtil{
+
+    /**
+     * You can predefine Sql connection parameters. This can be used when necessary to create multiple SQL connections and you need to store all values in same place.<br/>
+     * 
+     */
+    public static Map<String, String> props;
+
+    protected static Sql _createSqlConnProps(String name = "", Map outProps = null){
+        Map _props = outProps != null ? outProps : props;
+        if(_props != null && _props.containsKey(name + "DbUrl") && _props.containsKey(name + "DbUser") && _props.containsKey(name + "DbPass") && _props.containsKey(name + "DbDriver")){
+            return Sql.newInstance(
+                url: _props."${name}DbUrl".toString(),
+                user: _props."${name}DbUser".toString(),
+                password: _props."${name}DbPass".toString(),
+                driver: _props."${name}DbDriver".toString()
+            );
+        }else{
+            throw new Exception("EMException: Can't create SQL instance");
+        }
+    }
+
+    /**
+     * Create Sql connection from provided Properties Map. Use it with {@link SqlUtil#props} property
+     * @param name {@link String} Sql connection name from provided {@link SqlUtil#props} property. System will use {@code "${name}DbUrl"} pattern for receiving Sql Connection parameters.
+     * @return {@link Sql}
+     */
+    public static Sql createSqlConn(String name){
+        _createSqlConnProps(name);
+    }
+
+    /** 
+     * Create Sql connection from provided Properties Map
+     * @param outProps {@link Map} of SQL connection parameters
+     * @return {@link Sql}
+     */
+    public static Sql createSqlConn(Map outProps){
+        _createSqlConnProps("", outProps);
+    }
 
     /**
      * Creates SQL query string from file name.<br>

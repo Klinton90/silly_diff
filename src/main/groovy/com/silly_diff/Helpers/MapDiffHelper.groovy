@@ -1,7 +1,7 @@
-package main.java.com.silly_diff.Helpers
+package com.silly_diff.Helpers
 
 import groovy.util.logging.Slf4j
-import main.java.com.silly_diff.Infostructure.AbstractDiffHelper
+import com.silly_diff.Infostructure.AbstractDiffHelper
 
 /**
  * This class is currently under development. So please, don't use it. Hopefully, it will be finished soon...

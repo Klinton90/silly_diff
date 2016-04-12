@@ -1,4 +1,4 @@
-package main.java.com.silly_diff.Helpers
+package com.silly_diff.Helpers
 
 import groovy.util.logging.Slf4j
 import groovy.util.slurpersupport.Attribute
@@ -6,8 +6,8 @@ import groovy.util.slurpersupport.NodeChild
 import groovy.util.slurpersupport.NodeChildren
 import groovy.xml.StreamingMarkupBuilder
 import groovy.xml.XmlUtil
-import main.java.com.silly_diff.Infostructure.AbstractDiffHelper
-import main.java.com.silly_diff.Util.XmlUtil as MyXmlUtil
+import com.silly_diff.Infostructure.AbstractDiffHelper
+import com.silly_diff.Util.XmlUtil as MyXmlUtil
 
 import java.util.regex.Pattern
 
@@ -173,7 +173,7 @@ import java.util.regex.Pattern
  *      <ul>
  *        <li>
  *             1) Attributes:<br>
- *             Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code #ignoreAttrsCommand}.<br>
+ *             Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code #ignoreCommand}.<br>
  *             {@link Closure} must return {@link Boolean} value only.<br>
  *             {@link true}  -> Attribute will be ignored<br>
  *             {@link false} -> Attribute will be used for comparing<br>
@@ -182,7 +182,7 @@ import java.util.regex.Pattern
  * <dealer count="235">
  *     <SpecialProperties count="0"/>
  * </dealer>
- * xdh.ignoreAttrsCommand = {NodeChild XML ->
+ * xdh.ignoreCommand = {NodeChild XML ->
  *     return XML.@count != "" && XML.parent().name() == "SpecialProperties";
  * };
  * }</pre>
@@ -190,7 +190,7 @@ import java.util.regex.Pattern
  *         </li>
  *         </li>
  *              2) Nodes:<br>
- *              Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code ignoreNodesCommand}.<br>
+ *              Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code ignoreCommand}.<br>
  *              {@link Closure} must return Boolean value only.<br>
  *              {@link true}   -> Node will be ignored<br>
  *              {@link false}  -> Node will be used for comparing<br>
@@ -202,7 +202,7 @@ import java.util.regex.Pattern
  *         <property>Special</property>
  *     </SpecialProperties>
  * </dealer>
- * xdh.ignoreNodesCommand = {NodeChild XML ->
+ * xdh.ignoreCommand = {NodeChild XML ->
  *     return XML.name() == "property" && XML.localText()[0] == "NVD";
  * };
  * }</pre>
@@ -228,7 +228,7 @@ import java.util.regex.Pattern
  * 
  *     XmlDiffHelper xdh = new XmlDiffHelper(XmlDiffHelper.walkXmlByPath(listPath, qaXML), XmlDiffHelper.walkXmlByPath(listPath, prodXML));
  *     xdh.setIgnoreAttrs(["SpecialProperties.@count"]);
- *     xdh.ignoreNodesCommand = this.&filter;
+ *     xdh.ignoreCommand = this.&filter;
  *     xdh.calcDiff();
  * }
  * 
@@ -312,26 +312,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
     public HashMap<String, String> ignoreNodesWValues = new HashMap<String, String>();
 
     /**
-     * Assign {@link groovy.lang.Closure} that accepts 1 {@link groovy.util.slurpersupport.NodeChild} parameter to {@code #ignoreAttrsCommand}.<br>
-     * {@link groovy.lang.Closure} must return {@link Boolean} value only.<br>
-     * {@link true}  -> Attribute will be ignored<br>
-     * {@link false} -> Attribute will be used for comparing<br>
-     * For example:<br>
-     * <pre>{@code
-     * <dealer count="235">
-     *     <SpecialProperties count="0"/>
-     * </dealer>
-     * xdh.ignoreAttrsCommand = {NodeChild XML ->
-     *     return XML.@count != "" && XML.parent().name() == "SpecialProperties";
-     * };
-     * }</pre>
-     * {@code count} Attribute from "SpecialProperties" only will be ignored<br>
-     */
-    //public Closure<NodeChild> ignoreAttrsCommand;
-    public Closure ignoreAttrsCommand;
-
-    /**
-     * Assign {@link groovy.lang.Closure} that accepts 1 {@link groovy.util.slurpersupport.NodeChild} parameter to {@code ignoreNodesCommand}.<br>
+     * Assign {@link groovy.lang.Closure} that accepts 1 {@link groovy.util.slurpersupport.NodeChild} parameter to {@code ignoreCommand}.<br>
      * {@link groovy.lang.Closure} must return Boolean value only.<br>
      * {@link true}   -> Node will be ignored<br>
      * {@link false}  -> Node will be used for comparing<br>
@@ -343,13 +324,13 @@ public class XmlDiffHelper extends AbstractDiffHelper {
      *         <property>Special</property>
      *     </SpecialProperties>
      * </dealer>
-     * xdh.ignoreNodesCommand = {NodeChild XML ->
+     * xdh.ignoreCommand = {NodeChild XML ->
      *     return XML.name() == "property" && XML.localText()[0] == "NVD";
      * };
      * }</pre>
      *              "property" Node with text "NVD" only will be ignored. "property" Node with text "Special" will be compared.<br>
      */
-    public Closure ignoreNodesCommand;
+    public Closure<NodeChild> ignoreCommand;
 
     /**
      * By default CalcDiff() function works in "NonOrderlySafe" mode. It means, that nodes in Lists will be compared without<br>
@@ -449,8 +430,9 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         ignoreAttrs = (List<String>)params.get("ignoreAttrs", ignoreAttrs);
         ignoreNodes = (List<String>)params.get("ignoreNodes", ignoreNodes);
         ignoreNodesWValues = (HashMap<String, String>)params.get("ignoreNodesWValues", ignoreNodesWValues);
-        this.ignoreAttrsCommand = _getCommandFromParams(params, "ignoreAttrsCommand");
-        this.ignoreNodesCommand = _getCommandFromParams(params, "ignoreNodesCommand");
+        if(params.containsKey("ignoreCommand" + "_path")){
+            ignoreCommand = _getCommandFromParams(params, "ignoreCommand" + "_path");
+        }
         modifications1 = (HashMap<String, String>)params.get("modifications1", modifications1);
         modifications2 = (HashMap<String, String>)params.get("modifications2", modifications2);
         needleHelper = (List<String>)params.get("needleHelper", needleHelper);
@@ -650,7 +632,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         Map<String, String> attrs = node.attributes().clone();
         for(int i = 0; attrs.size() > i; i++){
             String attrName = attrs.keySet()[i];
-            if((ignoreAttrsCommand != null && ignoreAttrsCommand(node)) || _isAttrIgnorable(node)){
+            if((ignoreCommand != null && ignoreCommand(node)) || _isAttrIgnorable(node)){
                 if(_ref != null){
                     _ref.add(attrName);
                 }
@@ -695,7 +677,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         ArrayList<Integer> tmp = new ArrayList<Integer>();
         for(int i = 0; xml.size() > i; i++){
             NodeChild child = xml[i];
-            if((ignoreNodesCommand != null && ignoreNodesCommand(child)) || _isNodeIgnorable(child)){
+            if((ignoreCommand != null && ignoreCommand(child)) || _isNodeIgnorable(child)){
                 tmp.add(i);
             }
         }

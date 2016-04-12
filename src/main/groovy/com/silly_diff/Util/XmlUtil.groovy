@@ -1,4 +1,4 @@
-package main.java.com.silly_diff.Util
+package com.silly_diff.Util
 
 import groovy.util.slurpersupport.GPathResult
 import groovy.util.slurpersupport.NodeChild

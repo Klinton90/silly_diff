@@ -1,9 +1,9 @@
-package main.java.com.silly_diff.Infostructure
+package com.silly_diff.Infostructure
 
 import groovy.util.logging.Slf4j
 import groovy.util.slurpersupport.NodeChild
-import main.java.com.silly_diff.Util.JsonUtil
-import main.java.com.silly_diff.Util.XmlUtil
+import com.silly_diff.Util.JsonUtil
+import com.silly_diff.Util.XmlUtil
 
 /**
  * Parent class for Comparison implementations.<br>
@@ -14,7 +14,7 @@ public abstract class AbstractDiffHelper{
 
     public Closure<Boolean> watchDog;
 
-    public Boolean showErrors = true;
+    public Boolean showErrors = false;
     protected Boolean notified = false;
 
     public List outputList1;
@@ -49,35 +49,28 @@ public abstract class AbstractDiffHelper{
         return outputList1.size() == 0 && outputList2.size() == 0;
     }
 
-    protected Closure _getCommandFromParams(Map params, String name){
-        if(params.containsKey(name + "_path")){
-            String[] path = params.get(name + "_path").toString().split(">");
-            try{
-                return Class.forName(path[0]).&"${path[1]}";
-            }catch(Exception e){
-                log.info "EMException: Can't create Closure for '$name' from specified path: '${path}'";
-            }
-        }
+    protected static Closure _getCommandFromParams(Map params, String name){
+        String[] path = params.get(name + "_path").toString().split(">");
+        return Class.forName(path[0]).&"${path[1]}";
     }
     
-    protected String _applyModifications(Map<String,String> mods, String key, String value, Boolean applied = false){
+    protected String _applyModifications(Map<String,String> mods, String key, String value){
         String result = value;
         if(mods.size() > 0){
             if(mods.containsKey(key)){
-                mods.get(key).split("\\.").each{String mod ->
-                    result = result."$mod"();
+                def mod = mods.get(key);
+                if(mod instanceof String){
+                    mod.split("\\.").each{String _mod ->
+                        result = result."$_mod"();
+                    }
+                }else{
+                    result = mod(result);
                 }
-                applied = true;
-            }else{
+            }else if(mods.containsKey(key + "_path")){
                 Closure command = _getCommandFromParams(mods, key);
-                if(command != null){
-                    result = command(result);
-                    applied = true;
-                }
-            }
-
-            if(!applied){
-                _applyModifications(mods, "_all", result, true);
+                result = command(result);
+            }else if(mods.containsKey("_all")){
+                _applyModifications(mods, "_all", result);
             }
         }
         

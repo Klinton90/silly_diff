@@ -1,0 +1,17 @@
+version "0.1"
+group "silly_diff"
+
+apply plugin: 'groovy'
+
+repositories{
+    mavenCentral()
+}
+
+ext {
+    gradleWrapperVersion = project.gradleWrapperVersion
+}
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy-all:2.4.5'
+    compile 'org.slf4j:slf4j-api:1.7.12'
+}

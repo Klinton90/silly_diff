@@ -1,12 +1,12 @@
-package main.java.com.silly_diff.Helpers
+package com.silly_diff.Helpers
 
 import groovy.sql.GroovyRowResult
 import groovy.sql.Sql
 import groovy.util.logging.Slf4j
 import groovy.util.slurpersupport.NodeChild
 import groovy.xml.XmlUtil
-import main.java.com.silly_diff.Infostructure.AbstractDiffHelper
-import main.java.com.silly_diff.Util.SqlUtil
+import com.silly_diff.Infostructure.AbstractDiffHelper
+import com.silly_diff.Util.SqlUtil
 
 import java.util.regex.Pattern
 
