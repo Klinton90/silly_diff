@@ -534,10 +534,10 @@ public class XmlDiffHelper extends AbstractDiffHelper {
     }
     
     protected NodeChild _deleteIgnoredElements(NodeChild node){
-        List<String> tdas = new ArrayList<String>();
-        _deleteIgnoredAttrs(node, tdas);
+        //List<String> tdas = new ArrayList<String>();
+        List<String> tdas = _deleteIgnoredAttrs(node);
         for(int i = 0; i < tdas.size(); i++){
-            node."@${tdas[i]}" = null;
+            node.attributes().remove(tdas[i]);
         }
         
         List<NodeChild> tdns = new ArrayList<NodeChild>();
@@ -628,24 +628,23 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         return result;
     }
     
-    private _deleteIgnoredAttrs(NodeChild node, List<String> _ref = null){
+    private _deleteIgnoredAttrs(NodeChild node){
+        ArrayList<String> result = new ArrayList<String>();
         Map<String, String> attrs = node.attributes().clone();
         for(int i = 0; attrs.size() > i; i++){
             String attrName = attrs.keySet()[i];
-            if((ignoreCommand != null && ignoreCommand(node)) || _isAttrIgnorable(node)){
-                if(_ref != null){
-                    _ref.add(attrName);
-                }
-                attrs.remove(attrName);
+            if((ignoreCommand != null && ignoreCommand(node)) || _isAttrIgnorable(node, attrName)){
+                result.add(attrName);
             }
         }
-        return attrs;
+        return result;
     }
 
-    private Boolean _isAttrIgnorable(NodeChild node){
+    private Boolean _isAttrIgnorable(NodeChild node, String attrName){
         Boolean result = false;
         for(int i = 0; i < ignoreAttrs.size(); i++){
-            if(MyXmlUtil.isPathInXmlTree(ignoreAttrs[i], node, true)){
+            String[] _parts = ignoreAttrs[i].split("@");
+            if(_parts.size() == 2 && attrName == _parts[1] && MyXmlUtil.isPathInXmlTree(ignoreAttrs[i], node)){
                 result = true;
                 break;
             }

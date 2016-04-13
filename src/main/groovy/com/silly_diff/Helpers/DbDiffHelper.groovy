@@ -215,7 +215,7 @@ import java.util.regex.Pattern
  * You can use this pattern for providing additional parameters to SubQuery.<br>
  * For more information please refer to {@link DbDiffHelper#includedNodes} parameter description.<br>
  * ***********************************************************<br>
- * To create XmlTreeMap (list of column names) for DB query, use static function<br> {@link DbDiffHelper#mapXml(NodeChild node, String prefix = "")}
+ * To create XmlTreeMap (list of column names) for DB query, use static function<br> {@link com.silly_diff.Util.XmlUtil#mapXml(NodeChild node, String prefix = "")}
  * that consumes 1 parameter NodeChild,<br>
  * which is XML that you are going to use for comparing with each DbRow.<br>
  * Second parameter String @prefix should not be used in most cases,<br>

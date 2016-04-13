@@ -70,15 +70,24 @@ class XmlUtil{
      * @param Xml       XmlNode that will be investigated
      * @return          {@link true} if all elements listed in {@code listPath} exists for {@code Xml.parent()}
      */
-    public static Boolean isPathInXmlTree(String listPath, NodeChild Xml, Boolean forceHasAttr = false){
+    public static Boolean isPathInXmlTree(String listPath, NodeChild Xml){
         Boolean result = false;
-        if(!forceHasAttr || listPath.split('@').size() == 2){
-            String[] pathNodes = listPath.trim().split("\\.");
-            String attrName = pathNodes.last().trim();
-            if(attrName.substring(0, 1) == '@' && Xml[attrName] != ""){
-                pathNodes = pathNodes.dropRight(1);
+        String[] pathNodes = listPath.trim().split("\\.");
+        if(pathNodes.size() > 0){
+            Boolean hasAttr = false;
+            String[] _parts = listPath.split('@');
+            if(_parts.size() == 2){
+                if(Xml.attributes().containsKey(_parts[1])){
+                    pathNodes = pathNodes.dropRight(1);
+                    hasAttr = true;
+                }
             }
-            result = _isNodeInXmlTree(pathNodes, Xml);
+            
+            if(pathNodes.size() > 0){
+                result = _isNodeInXmlTree(pathNodes, Xml);
+            }else{
+                result = hasAttr;
+            }
         }
         return result;
     }
