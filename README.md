@@ -9,5 +9,5 @@ More information can be found in Wiki.
 * Gradle 2.3
 
 ## Links
-* http://klinton90.github.io/silly_diff/
-* https://github.com/Klinton90/silly_diff/wiki
+* GroovyDoc: http://klinton90.github.io/silly_diff/
+* Wiki: https://github.com/Klinton90/silly_diff/wiki
