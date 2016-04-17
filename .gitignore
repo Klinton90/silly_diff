@@ -1,5 +1,10 @@
-/build
-/WIKI.md
+/.gradle
 /.idea
-/silly_diff.iml
+/build
 /javadoc
+/out
+/silly_diff.iml
+/silly_diff.ipr
+/silly_diff.iws
+/WIKI.md
+

@@ -2,8 +2,10 @@ version "0.1"
 group "silly_diff"
 
 apply plugin: 'groovy'
+apply plugin: 'idea'
 
 repositories{
+    mavenLocal()
     mavenCentral()
 }
 
