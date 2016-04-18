@@ -1,5 +1,5 @@
 version "0.1"
-group "com.github.silly_diff"
+group "com.github.Klinton90"
 
 apply plugin: 'groovy'
 apply plugin: 'idea'
