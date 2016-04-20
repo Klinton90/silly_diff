@@ -104,7 +104,7 @@ public abstract class AbstractDiffHelper{
         if(element instanceof NodeChild){
             result = XmlUtil.printNode(element);
         }else{
-            result += JsonUtil.printMap(element);
+            result = JsonUtil.printMap(element);
         }
         return result;
     }
