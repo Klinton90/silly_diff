@@ -409,9 +409,6 @@ public class XmlDiffHelper extends AbstractDiffHelper {
      * </ul>
      */
     public Boolean orderlySafeChildrenMode = true;
-
-    private List<NodeChild> source1;
-    private List<NodeChild> source2;
     
     public XmlDiffHelper(List<NodeChild> xml1, List<NodeChild> xml2){
         source1 = xml1;
