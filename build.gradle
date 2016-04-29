@@ -17,5 +17,5 @@ ext {
 dependencies {
     compile 'org.codehaus.groovy:groovy-all:2.4.5'
     compile 'org.slf4j:slf4j-api:1.7.12'
-    complie 'org.slf4j:log4j-over-slf4j:1.7.12'
+    compile 'org.slf4j:log4j-over-slf4j:1.7.12'
 }
