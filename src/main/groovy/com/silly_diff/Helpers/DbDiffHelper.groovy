@@ -391,7 +391,8 @@ class DbDiffHelper extends AbstractDiffHelper {
      * However, it is extremely hard to implement something similar in such small library.<br>
      * That's why it has been proposed to replace mentioned nodes with "Included Queries".<br>
      * For example:<br>
-     * <pre>{@code<node>
+     * <pre>{@code
+     * <node>
      *     <name>Name1</name>
      *     <subNode>val1</subNode>
      *     <subNode>val2</subNode>
@@ -721,53 +722,5 @@ class DbDiffHelper extends AbstractDiffHelper {
             }
         }
         return arrayNodes;
-    }
-
-    /**
-     * Returns {@link String} with XML that shows diff found in specified element
-     * @deprecated This method will not be updated anymore. May be broken in future.
-     * @param source    {@link true} to use {@code #source1}, {@link false} to use {@code #source2}
-     * @return          Returns {@link String} with XML or JSON that shows diff found in specified element
-     */
-    @Deprecated
-    public String getDiffString(Boolean source){
-        String output = "";
-        if(source){
-            XmlDiffHelper xdh = new XmlDiffHelper(source1, toDel);
-            List<NodeChild> diff = xdh.retainNodes(true);
-            if(diff.size() > 0){
-                diff.each{i ->
-                    output += XmlUtil.serialize(i).substring(38);
-                };
-            }
-        }else{
-            List<Map<String, String>> rowsCopy = source2.toList();
-            rowsCopy.retainAll(toDelRows);
-            rowsCopy.each { i ->
-                output += i.toMapString();
-            };
-        }
-
-        return output;
-    }
-
-    /**
-     * Performing Diff calculation between consumed {@link List}
-     * and deletion from {@code #source1} elements that match with second list.
-     * @deprecated This method will not be updated anymore. May be broken in future.
-     * @return          Returns {@link List} of {@link groovy.util.slurpersupport.NodeChild} with nodes that do not match with second list.
-     */
-    @Deprecated
-    public List<NodeChild> retainNodes(){
-        List<NodeChild> _source = source1.toList();
-        source2.each{i1 ->
-            for(int i = 0; i < _source.size(); i++){
-                if(compareNodes(_source[i], i1)){
-                    _source.remove(i);
-                    break;
-                }
-            }
-        };
-        return _source;
     }
 }

@@ -5,10 +5,8 @@ import groovy.util.slurpersupport.Attribute
 import groovy.util.slurpersupport.NodeChild
 import groovy.util.slurpersupport.NodeChildren
 import groovy.xml.StreamingMarkupBuilder
-import groovy.xml.XmlUtil
 import com.silly_diff.Infostructure.AbstractDiffHelper
 import com.silly_diff.Util.XmlUtil as MyXmlUtil
-
 import java.util.regex.Pattern
 
 /**
@@ -444,95 +442,55 @@ public class XmlDiffHelper extends AbstractDiffHelper {
     public void calcDiff(){
         outputList1 = new ArrayList<NodeChild>();
         outputList2 = new ArrayList<NodeChild>();
-        List<NodeChild> xmlCopy1 = new ArrayList<NodeChild>();
-        List<NodeChild> xmlCopy2 = new ArrayList<NodeChild>();
+
         _deleteIgnoredNodes(source1).each{NodeChild xml->
-            xmlCopy1.add(new XmlSlurper().parseText(new StreamingMarkupBuilder().bindNode(_deleteIgnoredElements(xml)).toString()));
-        }
+            outputList1.add(new XmlSlurper().parseText(new StreamingMarkupBuilder().bindNode(_deleteIgnoredElements(xml)).toString()));
+        };
         _deleteIgnoredNodes(source2).each{NodeChild xml->
-            xmlCopy2.add(new XmlSlurper().parseText(new StreamingMarkupBuilder().bindNode(_deleteIgnoredElements(xml)).toString()));
-        }
-        if(orderlySafeMode){
-            int maxSize = Math.max(xmlCopy1.size(), xmlCopy2.size());
-            for(int i = 0; i < maxSize; i++){
-                if(watchDog != null && watchDog()){
-                    log.info("WatchDog in Xml2Xml");
-                    break;
-                }
-                
-                NodeChild curXml1 = xmlCopy1[i];
-                NodeChild curXml2 = xmlCopy2[i];
+            outputList2.add(new XmlSlurper().parseText(new StreamingMarkupBuilder().bindNode(_deleteIgnoredElements(xml)).toString()));
+        };
+
+        Iterator<NodeChild> xmlIter1 = outputList1.listIterator();
+        Iterator<NodeChild> xmlIter2 = outputList2.listIterator();
+        while(!(watchDog != null && watchDog()) && xmlIter1.hasNext()){
+            NodeChild curXml1 = xmlIter1.next();
+            if(orderlySafeMode){
                 notified = false;
-                if(curXml1 == null || curXml2 == null || !compareNodes(curXml1, curXml2)){
-                    if(curXml1 != null){
-                        outputList1.add(curXml1);
-                    }
-                    if(curXml2 != null){
-                        outputList2.add(curXml2);
-                    }
+                if(compareNodes(curXml1, xmlIter2.next())){
+                    xmlIter1.remove();
+                    xmlIter2.remove();
                 }
-            }
-        }else{
-            for(int k = 0; k < xmlCopy1.size(); k++){
-                NodeChild curXml1 = xmlCopy1[k];
-                
-                if(watchDog != null && watchDog()){
-                    log.info("WatchDog in Xml2Xml");
-                    break;
-                }
-                
-                if(needleHelper.size() > 0){
-                    Map<Integer, NodeChild> testListXml2 = new HashMap<Integer, NodeChild>();
-                    for(int j = 0; j < xmlCopy2.size(); j++){
-                        Boolean found = true;
-                        for(int i = 0; i < needleHelper.size(); i++){
-                            if(MyXmlUtil.walkXmlByPathForValue(needleHelper[i], curXml1) != MyXmlUtil.walkXmlByPathForValue(needleHelper[i], xmlCopy2[j])){
-                                found = false;
-                                break;
-                            }
-                        }
-                        if(found){
-                            testListXml2.put(j, xmlCopy2[j]);
-                        }
-                    }
-                    Boolean match = false;
-                    List<Integer> positionSet = testListXml2.keySet().sort().reverse();
-                    for(int i = 0; i < positionSet.size(); i++){
-                        Integer position = positionSet[i];
-                        NodeChild curXml2 = testListXml2[position];
-                        notified = false;
-                        if(compareNodes(curXml1, curXml2)){
-                            xmlCopy2.remove(position);
-                            match = true;
+            }else if(needleHelper.size() > 0){
+                for(int j = 0; j < outputList2.size(); j++){
+                    Boolean found = true;
+                    NodeChild curXml2 = outputList2[j];
+                    for(int k = 0; k < needleHelper.size(); k++){
+                        if(MyXmlUtil.walkXmlByPathForValue(needleHelper[k], curXml1) != MyXmlUtil.walkXmlByPathForValue(needleHelper[k], curXml2)){
+                            found = false;
                             break;
                         }
                     }
-                    if(!match){
-                        outputList1.add(curXml1);
+                    if(found && compareNodes(curXml1, curXml2)){
+                        outputList2.remove(j);
+                        xmlIter1.remove();
+                        break;
                     }
-                }else{
-                    Boolean match = false;
-                    for(int i = 0; i < xmlCopy2.size(); i++){
-                        NodeChild curXml2 = xmlCopy2[i];
-                        notified = false;
-                        if(compareNodes(curXml1, curXml2)){
-                            xmlCopy2.remove(i);
-                            match = true;
-                            break;
-                        }
-                    }
-                    if(!match){
-                        outputList1.add(curXml1);
+                }
+            }else{
+                Iterator<NodeChild> _xmlIter2 = outputList2.listIterator();
+                while(_xmlIter2.hasNext()){
+                    notified = false;
+                    if(compareNodes(curXml1, _xmlIter2.next())){
+                        xmlIter1.remove();
+                        _xmlIter2.remove();
                     }
                 }
             }
-            outputList2.addAll(xmlCopy2);
         }
     }
     
     protected NodeChild _deleteIgnoredElements(NodeChild node){
-        //List<String> tdas = new ArrayList<String>();
-        List<String> tdas = _deleteIgnoredAttrs(node);
+        List<String> tdas = _getIgnoredAttrs(node);
         for(int i = 0; i < tdas.size(); i++){
             node.attributes().remove(tdas[i]);
         }
@@ -625,7 +583,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         return result;
     }
     
-    private _deleteIgnoredAttrs(NodeChild node){
+    private _getIgnoredAttrs(NodeChild node){
         ArrayList<String> result = new ArrayList<String>();
         Map<String, String> attrs = node.attributes().clone();
         for(int i = 0; attrs.size() > i; i++){
@@ -692,8 +650,11 @@ public class XmlDiffHelper extends AbstractDiffHelper {
             String iPath = ignoreNodes[i];
             String[] iPathParts = iPath.split('>');
             if(
-                (iPathParts.size() == 2 && iPathParts[0].size() > 0 && iPathParts[1].size() > 0 && 
-                MyXmlUtil.isPathInXmlTree(iPathParts[0], node) && MyXmlUtil.walkXmlByPath(iPathParts[1], node).size() > 0) || MyXmlUtil.isPathInXmlTree(iPath, node)
+                (
+                    iPathParts.size() == 2 && iPathParts[0].size() > 0 && iPathParts[1].size() > 0 &&
+                    MyXmlUtil.isPathInXmlTree(iPathParts[0], node) && MyXmlUtil.walkXmlByPath(iPathParts[1], node).size() > 0
+                ) 
+                || MyXmlUtil.isPathInXmlTree(iPath, node)
             ){
                 result = true;
                 break;
@@ -747,58 +708,5 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         }
 
         return nodeChildren1.size() == matchCnt;
-    }
-
-    /**
-     * Returns {@link String} with XML that shows diff found in specified element
-     * @deprecated This method will not be updated anymore. May be broken in future.
-     * @param source    {@link true} to use {@code #source1}, {@link false} to use {@code #source2}
-     * @return          Returns {@link String} with XML that shows diff found in specified element
-     */
-    @Deprecated
-    public String getDiffString(Boolean source){
-        List<NodeChild> _source = source ? source1 : source2;
-        List<NodeChild> diff = retainNodes(_source, toDel);
-
-        String output = "";
-        if(diff.size() > 0){
-            diff.each{i ->
-                output += XmlUtil.serialize(i).substring(38);
-            };
-        }
-
-        return output;
-    }
-
-    /**
-     * Performing Diff calculation between consumed {@link List} of {@link groovy.util.slurpersupport.NodeChild}
-     * and deletion from {@code source} elements that match with second list.
-     * @deprecated This method will not be updated anymore. May be broken in future.
-     * @param source    {@link true} to use {@code #source1}, {@link false} to use {@code #source2}
-     * @return          Returns {@link List} of {@link groovy.util.slurpersupport.NodeChild} with nodes that do not match with second list.
-     */
-    @Deprecated
-    public List<NodeChild> retainNodes(Boolean source){
-        List<NodeChild> _source;
-        List<NodeChild> needles;
-
-        if(source){
-            _source = source1.toList();
-            needles = source2.toList();
-        }else{
-            _source = source2.toList();
-            needles = source1.toList();
-        }
-
-        needles.each{i1 ->
-            for(int i = 0; i < _source.size(); i++){
-                if(compareNodes(i1, _source[i])){
-                    _source.remove(i);
-                    break;
-                }
-            }
-        }
-
-        return _source;
     }
 }
