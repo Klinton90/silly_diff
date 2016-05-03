@@ -456,9 +456,13 @@ public class XmlDiffHelper extends AbstractDiffHelper {
             NodeChild curXml1 = xmlIter1.next();
             if(orderlySafeMode){
                 notified = false;
-                if(compareNodes(curXml1, xmlIter2.next())){
-                    xmlIter1.remove();
-                    xmlIter2.remove();
+                if(xmlIter2.hasNext()){
+                    if(compareNodes(curXml1, xmlIter2.next())){
+                        xmlIter1.remove();
+                        xmlIter2.remove();
+                    }
+                }else{
+                    break;
                 }
             }else if(needleHelper.size() > 0){
                 for(int j = 0; j < outputList2.size(); j++){
@@ -480,9 +484,13 @@ public class XmlDiffHelper extends AbstractDiffHelper {
                 Iterator<NodeChild> _xmlIter2 = outputList2.listIterator();
                 while(_xmlIter2.hasNext()){
                     notified = false;
-                    if(compareNodes(curXml1, _xmlIter2.next())){
-                        xmlIter1.remove();
-                        _xmlIter2.remove();
+                    if(_xmlIter2.hasNext()){
+                        if(compareNodes(curXml1, _xmlIter2.next())){
+                            xmlIter1.remove();
+                            _xmlIter2.remove();
+                            break;
+                        }
+                    }else{
                         break;
                     }
                 }

@@ -480,18 +480,26 @@ class DbDiffHelper extends AbstractDiffHelper {
                 if(orderlySafeMode){
                     notified = false;
                     Map<String, String> curRow = new HashMap<String, String>(rowIter.next());
-                    if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
-                        xmlIter.remove();
-                        rowIter.remove();
+                    if(rowIter.hasNext()){
+                        if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
+                            xmlIter.remove();
+                            rowIter.remove();
+                        }
+                    }else{
+                        break;
                     }
                 }else{
                     Iterator<HashMap<String, String>> _rowIter = outputList2.listIterator();
                     while(_rowIter.hasNext()){
                         notified = false;
                         Map<String, String> curRow = new HashMap<String, String>(_rowIter.next());
-                        if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
-                            xmlIter.remove();
-                            _rowIter.remove();
+                        if(_rowIter.hasNext()){
+                            if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
+                                xmlIter.remove();
+                                _rowIter.remove();
+                                break;
+                            }
+                        }else{
                             break;
                         }
                     }
