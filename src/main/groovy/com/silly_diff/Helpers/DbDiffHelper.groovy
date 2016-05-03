@@ -667,7 +667,7 @@ class DbDiffHelper extends AbstractDiffHelper {
         return result;
     }
     
-    protected Map<String, String> _addSubRowsToParentRow(List<Map<String, String>> subRows, String prefix, Map<String, String> row){
+    protected static Map<String, Object> _addSubRowsToParentRow(List<Map<String, String>> subRows, String prefix, Map<String, Object> row){
         for(int i = 0; i < subRows.size(); i++){
             Map<String, String> curRow = subRows[i]
             for(int j = 0; j < curRow.keySet().size(); j++){
@@ -678,7 +678,7 @@ class DbDiffHelper extends AbstractDiffHelper {
                     suffix += "." + keyParts[k];
                 }
 
-                row.put("${prefix}.${keyParts[0]}.>${i}${suffix}".toString(), curRow[curKey].toString());
+                row.put("${prefix}.${keyParts[0]}.>${i}${suffix}".toString(), curRow[curKey]);
             }
         }
         return row;
@@ -698,7 +698,7 @@ class DbDiffHelper extends AbstractDiffHelper {
         return completeMatch;
     }
 
-    private String _cleanNewLines(String source){
+    private static String _cleanNewLines(String source){
         if(source != null && source.substring(0,1) == "\n" && source.substring(source.size() - 1) == "\n"){
             source = source.substring(1);
             source = source.substring(0, source.size() - 1);
@@ -706,7 +706,7 @@ class DbDiffHelper extends AbstractDiffHelper {
         return source;
     }
 
-    private HashMap<String, ArrayList<Integer>> _parseColumns(Map<String, String> row){
+    private static HashMap<String, ArrayList<Integer>> _parseColumns(Map<String, String> row){
         HashMap<String, ArrayList<Integer>> arrayNodes = new HashMap<String, ArrayList<Integer>>();
         for(int i = 0; i < row.keySet().size(); i++){
             String key = row.keySet()[i];
