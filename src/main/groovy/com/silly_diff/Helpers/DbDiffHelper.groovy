@@ -456,8 +456,8 @@ class DbDiffHelper extends AbstractDiffHelper {
      * Every time when called, overrides Diff and output Xml.
      */
     public void calcDiff(){
-        outputList1 = new ArrayList<NodeChild>();
-        outputList2 = new ArrayList<HashMap<String, String>>();
+        outputList1 = new ArrayList<NodeChild>(source1);
+        outputList2 = new ArrayList<HashMap<String, String>>(source2);
         if(source2.size() > 0) {
             for(int i = 0; i < source2.size(); i++){
                 for(int j = 0; j < includedNodes.keySet().size(); j++){
@@ -473,54 +473,30 @@ class DbDiffHelper extends AbstractDiffHelper {
                     _addSubRowsToParentRow(subRows, prefix, source2[i]);
                 }
             }
-            if (orderlySafeMode) {
-                int maxSize = Math.min(source1.size(), source2.size());
-                for (int i = 0; i < maxSize; i++) {
-                    if(watchDog != null && watchDog()){
-                        log.info("WatchDog in Xml2Db");
-                        break;
-                    }
-                    NodeChild curXml = source1[i];
-                    Map<String, String> curRow = source2[i];
+            Iterator<NodeChild> xmlIter = outputList1.listIterator();
+            Iterator<HashMap<String, String>> rowIter = outputList2.listIterator();
+            while(!(watchDog != null && watchDog()) && xmlIter.hasNext()){
+                NodeChild curXml = xmlIter.next();
+                if(orderlySafeMode){
                     notified = false;
-                    Map<String, String> shallowCopy = new HashMap<String, String>(curRow);
-                    if(!compareNodes(curXml, shallowCopy) || !_isCompleteMatch(shallowCopy)){
-                        if(curXml != null){
-                            outputList1.add(curXml);
-                        }
-                        if(curRow != null){
-                            outputList2.add(curRow);
-                        }
+                    Map<String, String> curRow = new HashMap<String, String>(rowIter.next());
+                    if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
+                        xmlIter.remove();
+                        rowIter.remove();
                     }
-                }
-            } else {
-                List<Map<String, String>> rowsCopy = source2.toList();
-                for(int k = 0; k < source1.size(); k++){
-                    NodeChild curXml = source1[k];
-                    
-                    if(watchDog != null && watchDog()){
-                        log.info("WatchDog in Xml2Db");
-                        break;
-                    }
-                    
-                    Boolean match = false;
-                    for (int i = 0; i < rowsCopy.size(); i++) {
+                }else{
+                    Iterator<HashMap<String, String>> _rowIter = outputList2.listIterator();
+                    while(_rowIter.hasNext()){
                         notified = false;
-                        Map<String, String> curRow = new HashMap<String, String>(rowsCopy[i]);
-                        if (compareNodes(curXml, curRow) && _isCompleteMatch(curRow)) {
-                            rowsCopy.remove(i);
-                            match = true;
+                        Map<String, String> curRow = new HashMap<String, String>(_rowIter.next());
+                        if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
+                            xmlIter.remove();
+                            _rowIter.remove();
                             break;
                         }
                     }
-                    if(!match){
-                        outputList1.add(curXml);
-                    }
                 }
-                outputList2 = rowsCopy;
             }
-        }else{
-            outputList1.addAll(source1);
         }
     }
 

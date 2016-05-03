@@ -483,6 +483,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
                     if(compareNodes(curXml1, _xmlIter2.next())){
                         xmlIter1.remove();
                         _xmlIter2.remove();
+                        break;
                     }
                 }
             }
