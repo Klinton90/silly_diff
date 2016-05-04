@@ -479,8 +479,8 @@ class DbDiffHelper extends AbstractDiffHelper {
                 NodeChild curXml = xmlIter.next();
                 if(orderlySafeMode){
                     notified = false;
-                    Map<String, String> curRow = new HashMap<String, String>(rowIter.next());
                     if(rowIter.hasNext()){
+                        Map<String, String> curRow = new HashMap<String, String>(rowIter.next());
                         if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
                             xmlIter.remove();
                             rowIter.remove();
@@ -492,8 +492,8 @@ class DbDiffHelper extends AbstractDiffHelper {
                     Iterator<HashMap<String, String>> _rowIter = outputList2.listIterator();
                     while(_rowIter.hasNext()){
                         notified = false;
-                        Map<String, String> curRow = new HashMap<String, String>(_rowIter.next());
                         if(_rowIter.hasNext()){
+                            Map<String, String> curRow = new HashMap<String, String>(_rowIter.next());
                             if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
                                 xmlIter.remove();
                                 _rowIter.remove();
