@@ -1,5 +1,5 @@
 # silly_diff
-Allows to compare XML 2 XML or XML 2 DB objects.
+Compare XML 2 XML or XML 2 DB objects with range of features such as ignorable nodes, order control and node injections.
 
 More information can be found in Wiki.
 
