@@ -71,12 +71,17 @@ class SqlUtil{
         }else{
             throw new Exception("EMException: SQL file $fileLocation not found");
         }
+        
+        
 
-        Matcher matcher = Pattern.compile(/;\s$/).matcher(query);
+        return _cleanQuery(query);
+    }
+    
+    protected static String _cleanQuery(String query){
+        Matcher matcher = Pattern.compile(/;\s*$/).matcher(query);
         if(matcher.find()){
             query = matcher.replaceAll("");
         }
-
         return query;
     }
 
@@ -130,7 +135,7 @@ class SqlUtil{
     public static List<GroovyRowResult> execute(Sql sql, String query, Map<String, Object> params = null){
         List<GroovyRowResult> result;
         Map<String,String> inParams = getInParams(params);
-        String _query = applyInVars(inParams, query);
+        String _query = applyInVars(inParams, _cleanQuery(query));
         if(_query.indexOf(":") >=0 && params != null){
             result = sql.rows(params, _query);
         }else{

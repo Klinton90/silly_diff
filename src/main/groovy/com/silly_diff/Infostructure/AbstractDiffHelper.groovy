@@ -23,8 +23,11 @@ public abstract class AbstractDiffHelper{
     public List source1;
     public List source2;
 
-    public Map<String, String> modifications1 = new HashMap<String, String>();
-    public Map<String, String> modifications2 = new HashMap<String, String>();
+    public HashMap<String, Object> modifications1 = new HashMap<>();
+    public HashMap<String, Object> modifications2 = new HashMap<>();
+
+    public int counter = 0;
+    public int total = 0;
 
     /**
      * Setup all input parameters from {@link Map} {@code config} file
@@ -54,26 +57,57 @@ public abstract class AbstractDiffHelper{
         return Class.forName(path[0]).&"${path[1]}";
     }
     
-    protected String _applyModifications(Map<String,String> mods, String key, String value){
-        String result = value;
-        if(mods.size() > 0){
-            if(mods.containsKey(key)){
-                def mod = mods.get(key);
-                if(mod instanceof String){
-                    mod.split("\\.").each{String _mod ->
-                        result = result."$_mod"();
-                    }
+    protected static shell = new GroovyShell();
+    
+    protected static void _createModificators(HashMap<String, String> _mods, HashMap<String, Object> mods){
+        if(_mods != null){
+            for(Map.Entry<String, String> mod : _mods){
+                String key = mod.getKey();
+                if(key.endsWith("_path")){
+                    String[] path = mod.getValue().split(">");
+                    mods.put(key, Class.forName(path[0]).&"${path[1]}");
                 }else{
-                    result = mod(result);
+                    mods.put(key, shell.parse(mod.getValue()));
                 }
-            }else if(mods.containsKey(key + "_path")){
-                Closure command = _getCommandFromParams(mods, key);
-                result = command(result);
-            }else if(mods.containsKey("_all")){
-                _applyModifications(mods, "_all", result);
             }
         }
+    }
+
+    protected static String _applyModifications(Map<String, Object> mods, String key, Object obj, Boolean all = false){
+        String result;
+        if(obj instanceof NodeChild && key.substring(0, 1) != "@"){
+            result = obj.localText()[0];
+        }else{
+            result = obj[key].toString();
+        }
         
+        if(mods.size() > 0){
+            if(mods.containsKey(key)){
+                try{
+                    Binding binding = new Binding();
+                    binding.setProperty("value", result);
+                    binding.setProperty("key", key);
+                    binding.setProperty("obj", obj);
+                    binding.setProperty("result", "");
+                    Script script = (Script)mods.get(key);
+                    script.binding = binding;
+                    script.run();
+                    result = binding.getProperty("result").toString();
+                }catch(Exception e){
+                    log.info("Modificator failed: '" + e.getMessage() + "'. Continue execution with original value.");
+                }
+            }else if(mods.containsKey(key + "_path")){
+                Closure command = (Closure)mods.get(key + "_path");
+                result = command(result, key, obj);
+            }else if(!all){
+                if(mods.containsKey("_all")){
+                    _applyModifications(mods, "_all", obj, true);
+                }else if(mods.containsKey("_all_path")){
+                    _applyModifications(mods, "_all_path", obj, true);
+                }
+            }
+        }
+
         return result;
     }
 

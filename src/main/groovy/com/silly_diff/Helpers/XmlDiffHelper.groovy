@@ -7,6 +7,8 @@ import groovy.util.slurpersupport.NodeChildren
 import groovy.xml.StreamingMarkupBuilder
 import com.silly_diff.Infostructure.AbstractDiffHelper
 import com.silly_diff.Util.XmlUtil as MyXmlUtil
+import groovy.xml.XmlUtil
+
 import java.util.regex.Pattern
 
 /**
@@ -171,7 +173,7 @@ import java.util.regex.Pattern
  *      <ul>
  *        <li>
  *             1) Attributes:<br>
- *             Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code #ignoreCommand}.<br>
+ *             Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code #ignoreNodeCommand}.<br>
  *             {@link Closure} must return {@link Boolean} value only.<br>
  *             {@link true}  -> Attribute will be ignored<br>
  *             {@link false} -> Attribute will be used for comparing<br>
@@ -180,7 +182,7 @@ import java.util.regex.Pattern
  * <dealer count="235">
  *     <SpecialProperties count="0"/>
  * </dealer>
- * xdh.ignoreCommand = {NodeChild XML ->
+ * xdh.ignoreNodeCommand = {NodeChild XML ->
  *     return XML.@count != "" && XML.parent().name() == "SpecialProperties";
  * };
  * }</pre>
@@ -188,7 +190,7 @@ import java.util.regex.Pattern
  *         </li>
  *         </li>
  *              2) Nodes:<br>
- *              Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code ignoreCommand}.<br>
+ *              Assign {@link Closure} that accepts 1 {@link NodeChild} parameter to {@code ignoreNodeCommand}.<br>
  *              {@link Closure} must return Boolean value only.<br>
  *              {@link true}   -> Node will be ignored<br>
  *              {@link false}  -> Node will be used for comparing<br>
@@ -200,7 +202,7 @@ import java.util.regex.Pattern
  *         <property>Special</property>
  *     </SpecialProperties>
  * </dealer>
- * xdh.ignoreCommand = {NodeChild XML ->
+ * xdh.ignoreNodeCommand = {NodeChild XML ->
  *     return XML.name() == "property" && XML.localText()[0] == "NVD";
  * };
  * }</pre>
@@ -226,7 +228,7 @@ import java.util.regex.Pattern
  * 
  *     XmlDiffHelper xdh = new XmlDiffHelper(XmlDiffHelper.walkXmlByPath(listPath, qaXML), XmlDiffHelper.walkXmlByPath(listPath, prodXML));
  *     xdh.setIgnoreAttrs(["SpecialProperties.@count"]);
- *     xdh.ignoreCommand = this.&filter;
+ *     xdh.ignoreNodeCommand = this.&filter;
  *     xdh.calcDiff();
  * }
  * 
@@ -310,7 +312,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
     public HashMap<String, String> ignoreNodesWValues = new HashMap<String, String>();
 
     /**
-     * Assign {@link groovy.lang.Closure} that accepts 1 {@link groovy.util.slurpersupport.NodeChild} parameter to {@code ignoreCommand}.<br>
+     * Assign {@link groovy.lang.Closure} that accepts 1 {@link groovy.util.slurpersupport.NodeChild} parameter to {@code ignoreNodeCommand}.<br>
      * {@link groovy.lang.Closure} must return Boolean value only.<br>
      * {@link true}   -> Node will be ignored<br>
      * {@link false}  -> Node will be used for comparing<br>
@@ -322,13 +324,34 @@ public class XmlDiffHelper extends AbstractDiffHelper {
      *         <property>Special</property>
      *     </SpecialProperties>
      * </dealer>
-     * xdh.ignoreCommand = {NodeChild XML ->
+     * xdh.ignoreNodeCommand = {NodeChild XML ->
      *     return XML.name() == "property" && XML.localText()[0] == "NVD";
      * };
      * }</pre>
      *              "property" Node with text "NVD" only will be ignored. "property" Node with text "Special" will be compared.<br>
      */
-    public Closure<NodeChild> ignoreCommand;
+    public Closure<Boolean> ignoreNodeCommand;
+
+    /**
+     * Assign {@link groovy.lang.Closure} that accepts 2 parameters: {@link groovy.util.slurpersupport.NodeChild} and {@link String} to {@code ignoreAttrCommand}.<br>
+     * {@link groovy.lang.Closure} must return Boolean value only.<br>
+     * {@link true}   -> Provided Attribute will be ignored<br>
+     * {@link false}  -> Provided Attribute will be used for comparing<br>
+     * For example:<br>
+     * <pre>{@code
+     * <dealer>
+     *     <SpecialProperties val="doNotIgnoreMe">
+     *         <property val="NVD" other="1"/>
+     *         <property val="Special" other="2"/>
+     *     </SpecialProperties>
+     * </dealer>
+     * xdh.ignoreNodeCommand = {NodeChild XML, String attribute ->
+     *     return XML.name() == "property" && attribute == "val" && val == "NVD";
+     * };
+     * }</pre>
+     *              "property" Node with text "NVD" only will be ignored. "property" Node with text "Special" will be compared.<br>
+     */
+    public Closure<Boolean> ignoreAttrCommand;
 
     /**
      * By default CalcDiff() function works in "NonOrderlySafe" mode. It means, that nodes in Lists will be compared without<br>
@@ -409,8 +432,14 @@ public class XmlDiffHelper extends AbstractDiffHelper {
     public Boolean orderlySafeChildrenMode = true;
     
     public XmlDiffHelper(List<NodeChild> xml1, List<NodeChild> xml2){
-        source1 = xml1;
-        source2 = xml2;
+        source1 = new ArrayList<NodeChild>();
+        source2 = new ArrayList<NodeChild>();
+        xml1.each{NodeChild xml->
+            source1.add(new XmlSlurper().parseText(XmlUtil.serialize(xml)));
+        }
+        xml2.each{NodeChild xml->
+            source2.add(new XmlSlurper().parseText(XmlUtil.serialize(xml)));
+        }
     }
 
     /**
@@ -425,13 +454,16 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         ignoreAttrs = (List<String>)params.get("ignoreAttrs", ignoreAttrs);
         ignoreNodes = (List<String>)params.get("ignoreNodes", ignoreNodes);
         ignoreNodesWValues = (HashMap<String, String>)params.get("ignoreNodesWValues", ignoreNodesWValues);
-        if(params.containsKey("ignoreCommand" + "_path")){
-            ignoreCommand = _getCommandFromParams(params, "ignoreCommand" + "_path");
+        if(params.containsKey("ignoreNodeCommand" + "_path")){
+            ignoreNodeCommand = _getCommandFromParams(params, "ignoreNodeCommand" + "_path");
         }
-        modifications1 = (HashMap<String, String>)params.get("modifications1", modifications1);
-        modifications2 = (HashMap<String, String>)params.get("modifications2", modifications2);
+        if(params.containsKey("ignoreAttrCommand" + "_path")){
+            ignoreAttrCommand = _getCommandFromParams(params, "ignoreAttrCommand" + "_path");
+        }
         needleHelper = (List<String>)params.get("needleHelper", needleHelper);
         needleHelper.removeAll(['', null]);
+        _createModificators((HashMap<String, String>)params.get("modifications1"), modifications1);
+        _createModificators((HashMap<String, String>)params.get("modifications2"), modifications2);
     }
 
     /**
@@ -440,19 +472,23 @@ public class XmlDiffHelper extends AbstractDiffHelper {
      * Every time when called, overrides Diff and output Xml.
      */
     public void calcDiff(){
+        counter = 0;
         outputList1 = new ArrayList<NodeChild>();
         outputList2 = new ArrayList<NodeChild>();
-
+        
+        //must serialize/deserialize as changes from "delete" functions will NOT be applied without that action
         _deleteIgnoredNodes(source1).each{NodeChild xml->
             outputList1.add(new XmlSlurper().parseText(new StreamingMarkupBuilder().bindNode(_deleteIgnoredElements(xml)).toString()));
         };
         _deleteIgnoredNodes(source2).each{NodeChild xml->
             outputList2.add(new XmlSlurper().parseText(new StreamingMarkupBuilder().bindNode(_deleteIgnoredElements(xml)).toString()));
         };
+        total = Math.max(outputList1.size(), outputList2.size());
 
         Iterator<NodeChild> xmlIter1 = outputList1.listIterator();
         Iterator<NodeChild> xmlIter2 = outputList2.listIterator();
         while(!(watchDog != null && watchDog()) && xmlIter1.hasNext()){
+            counter++;
             NodeChild curXml1 = xmlIter1.next();
             if(orderlySafeMode){
                 notified = false;
@@ -484,13 +520,9 @@ public class XmlDiffHelper extends AbstractDiffHelper {
                 Iterator<NodeChild> _xmlIter2 = outputList2.listIterator();
                 while(_xmlIter2.hasNext()){
                     notified = false;
-                    if(_xmlIter2.hasNext()){
-                        if(compareNodes(curXml1, _xmlIter2.next())){
-                            xmlIter1.remove();
-                            _xmlIter2.remove();
-                            break;
-                        }
-                    }else{
+                    if(compareNodes(curXml1, _xmlIter2.next())){
+                        xmlIter1.remove();
+                        _xmlIter2.remove();
                         break;
                     }
                 }
@@ -499,22 +531,35 @@ public class XmlDiffHelper extends AbstractDiffHelper {
     }
     
     protected NodeChild _deleteIgnoredElements(NodeChild node){
-        List<String> tdas = _getIgnoredAttrs(node);
-        for(int i = 0; i < tdas.size(); i++){
-            node.attributes().remove(tdas[i]);
+        Iterator<String> attrsIter = node.attributes().iterator();
+        while(attrsIter.hasNext()){
+            if(_isAttrIgnorable(node, attrsIter.next().getKey())){
+                attrsIter.remove();
+            }
         }
         
-        List<NodeChild> tdns = new ArrayList<NodeChild>();
-        List<NodeChild> nodeChildren = _deleteIgnoredNodes(node.children().list(), tdns);
-        for(int i = 0; i < tdns.size(); i++){
-            tdns[i].replaceNode{};
-        }
-
+        List<NodeChild> nodeChildren = _deleteIgnoredNodes(node.children().list());
         for(int i = 0; i < nodeChildren.size(); i++){
             _deleteIgnoredElements(nodeChildren[i]);
         }
         
         return node;
+    }
+
+    private List<NodeChild> _deleteIgnoredNodes(List<NodeChild> Xml){
+        ArrayList<NodeChild> result = new ArrayList<>();
+        Iterator<NodeChild> xmlIter = Xml.iterator();
+        while(xmlIter.hasNext()){
+            NodeChild child = xmlIter.next();
+            if(_isNodeIgnorable(child)){
+                child.replaceNode{};
+                xmlIter.remove();
+            }else{
+                result.add(child);
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -534,14 +579,11 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         Map<String, List<String>> debug = new HashMap<String, List<String>>();
 
         if(node1 != null && node2 != null && node1.name() == node2.name()){
-            Map<String, String> attrs1 = node1.attributes();
-            Map<String, String> attrs2 = node2.attributes()
-
-            int aCnt1 = attrs1.size();
-            int aCnt2 = attrs2.size();
+            int aCnt1 = node1.attributes().size();
+            int aCnt2 = node2.attributes().size();
             debug.put("attrSize", [aCnt1.toString(), aCnt2.toString()]);
             
-            if(aCnt1 == aCnt2 && (aCnt1 == 0 || _compareAttrs(attrs1, attrs2, debug))){
+            if(aCnt1 == aCnt2 && (aCnt1 == 0 || _compareAttrs(node1, node2, debug))){
                 List<NodeChild> nodeChildren1 = node1.children().list();
                 List<NodeChild> nodeChildren2 = node2.children().list();
 
@@ -550,23 +592,7 @@ public class XmlDiffHelper extends AbstractDiffHelper {
                 debug.put("ChildrenCount", [cCnt1.toString(), cCnt2.toString()]);
                 
                 if(cCnt1 == cCnt2 && (cCnt1 == 0 || _compareChildren(nodeChildren1, nodeChildren2))){
-                    if(node1.localText().size() == node2.localText().size()){
-                        int textMatchCnt = 0;
-                        for(int i = 0; node1.localText().size() > i; i++){
-                            String text1 = node1.localText().getAt(i);
-                            String text2 = node2.localText().getAt(i);
-                            
-                            debug.put(node1.name(), [_applyModifications(modifications1, node1.name(), text1), _applyModifications(modifications2, node2.name(), text2)]);
-
-                            if(text1 == text2){
-                                textMatchCnt++;
-                            }else{
-                                break;
-                            }
-                        }
-                        
-                        result = textMatchCnt == node1.localText().size();
-                    }
+                    result = _applyModifications(modifications1, node1.name(), node1) == _applyModifications(modifications2, node2.name(), node2);
                 }
             }
         }
@@ -591,41 +617,38 @@ public class XmlDiffHelper extends AbstractDiffHelper {
 
         return result;
     }
-    
-    private _getIgnoredAttrs(NodeChild node){
-        ArrayList<String> result = new ArrayList<String>();
-        Map<String, String> attrs = node.attributes().clone();
-        for(int i = 0; attrs.size() > i; i++){
-            String attrName = attrs.keySet()[i];
-            if((ignoreCommand != null && ignoreCommand(node)) || _isAttrIgnorable(node, attrName)){
-                result.add(attrName);
-            }
-        }
-        return result;
-    }
 
     private Boolean _isAttrIgnorable(NodeChild node, String attrName){
         Boolean result = false;
-        for(int i = 0; i < ignoreAttrs.size(); i++){
-            String[] _parts = ignoreAttrs[i].split("@");
-            if(_parts.size() == 2 && attrName == _parts[1] && MyXmlUtil.isPathInXmlTree(ignoreAttrs[i], node)){
-                result = true;
-                break;
+
+        if(ignoreAttrCommand != null){
+            result = ignoreAttrCommand(node, attrName);
+        }
+        
+        if(!result){
+            for(int i = 0; i < ignoreAttrs.size(); i++){
+                String[] _parts = ignoreAttrs[i].split("@");
+                if(_parts.size() == 2 && attrName == _parts[1] && MyXmlUtil.isPathInXmlTree(ignoreAttrs[i], node)){
+                    result = true;
+                    break;
+                }
             }
         }
+        
         return result;
     }
     
-    private Boolean _compareAttrs(Map<String, String> attrs1, Map<String, String> attrs2, Map<String, List<String>> debug){
+    private Boolean _compareAttrs(NodeChild node1, NodeChild node2, Map<String, List<String>> debug){
         int matchCnt = 0;
+        
+        Map<String, String> attrs1 = node1.attributes();
+        
         for(int i = 0; i < attrs1.size(); i++){
             String curAttr = attrs1.keySet()[i];
-            String attr1 = attrs1.get(curAttr);
-            String attr2 = attrs2.get(curAttr);
             
-            debug.put(curAttr, [attr1, attr2]);
+            debug.put(curAttr, [attrs1.get(curAttr).toString(), node2.attributes().get(curAttr).toString()]);
 
-            if(_applyModifications(modifications1, curAttr, attr1) == _applyModifications(modifications2, curAttr, attr2)){
+            if(_applyModifications(modifications1, "@" + curAttr, node1) == _applyModifications(modifications2, "@" + curAttr, node2)){
                 matchCnt++;
             }else{
                 break;
@@ -634,57 +657,46 @@ public class XmlDiffHelper extends AbstractDiffHelper {
         
         return matchCnt == attrs1.size();
     }
-    
-    private List<NodeChild> _deleteIgnoredNodes(List<NodeChild> Xml, List<NodeChild> _ref = null){
-        List<NodeChild> xml = Xml.toList();
-        ArrayList<Integer> tmp = new ArrayList<Integer>();
-        for(int i = 0; xml.size() > i; i++){
-            NodeChild child = xml[i];
-            if((ignoreCommand != null && ignoreCommand(child)) || _isNodeIgnorable(child)){
-                tmp.add(i);
-            }
-        }
-        for(int j = tmp.size() - 1; j >= 0; j--){
-            if(_ref != null){
-                _ref.add(xml[tmp[j]]);
-            }
-            xml.remove(tmp[j]);
-        }
-        return xml;
-    }
 
     private Boolean _isNodeIgnorable(NodeChild node){
         Boolean result = false;
-        for(int i = 0; i < ignoreNodes.size(); i++){
-            String iPath = ignoreNodes[i];
-            String[] iPathParts = iPath.split('>');
-            if(
+        
+        if(ignoreNodeCommand != null){
+            result = ignoreNodeCommand(node);
+        }
+        
+        if(!result){
+            for(int i = 0; i < ignoreNodes.size(); i++){
+                String iPath = ignoreNodes[i];
+                String[] iPathParts = iPath.split('>');
+                if(
                 (
                     iPathParts.size() == 2 && iPathParts[0].size() > 0 && iPathParts[1].size() > 0 &&
-                    MyXmlUtil.isPathInXmlTree(iPathParts[0], node) && MyXmlUtil.walkXmlByPath(iPathParts[1], node).size() > 0
-                ) 
-                || MyXmlUtil.isPathInXmlTree(iPath, node)
-            ){
-                result = true;
-                break;
-            }
-        }
-
-        if(!result){
-            for(int i = 0; i < ignoreNodesWValues.size(); i++){
-                String iPath = ignoreNodesWValues.keySet()[i];
-                String[] iPathParts = iPath.split('>');
-                
-                if(
-                    (
-                        iPathParts.size() == 2
-                        && MyXmlUtil.isPathInXmlTree(iPathParts[0], node)
-                        && Pattern.compile(ignoreNodesWValues[iPath]).matcher(MyXmlUtil.walkXmlByPathForValue(iPathParts[1], node)).find()
-                    )
-                    || Pattern.compile(ignoreNodesWValues[iPath]).matcher(MyXmlUtil.walkXmlByPathForValue(iPath, node)).find()
+                        MyXmlUtil.isPathInXmlTree(iPathParts[0], node) && MyXmlUtil.walkXmlByPath(iPathParts[1], node).size() > 0
+                )
+                    || MyXmlUtil.isPathInXmlTree(iPath, node)
                 ){
                     result = true;
                     break;
+                }
+            }
+
+            if(!result){
+                for(int i = 0; i < ignoreNodesWValues.size(); i++){
+                    String iPath = ignoreNodesWValues.keySet()[i];
+                    String[] iPathParts = iPath.split('>');
+
+                    if(
+                    (
+                        iPathParts.size() == 2
+                            && MyXmlUtil.isPathInXmlTree(iPathParts[0], node)
+                            && Pattern.compile(ignoreNodesWValues[iPath]).matcher(MyXmlUtil.walkXmlByPathForValue(iPathParts[1], node)).find()
+                    )
+                        || Pattern.compile(ignoreNodesWValues[iPath]).matcher(MyXmlUtil.walkXmlByPathForValue(iPath, node)).find()
+                    ){
+                        result = true;
+                        break;
+                    }
                 }
             }
         }

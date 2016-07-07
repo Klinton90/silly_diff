@@ -428,9 +428,19 @@ class DbDiffHelper extends AbstractDiffHelper {
      * */
     public Sql sql;
     
-    public DbDiffHelper(List<NodeChild> xml, List<Map<String, String>> rows){
-        source1 = xml;
-        source2 = rows;
+    public DbDiffHelper(List<NodeChild> xml, List<Map<String, Object>> rows){
+        source1 = new ArrayList<NodeChild>();
+        source2 = new ArrayList<Map<String, String>>();
+        xml.each{NodeChild _xml->
+            source1.add(new XmlSlurper().parseText(XmlUtil.serialize(_xml)));
+        };
+        rows.each{Map<String, Object> row ->
+            HashMap<String, String> newRow = new HashMap<>();
+            row.each{String key, Object val ->
+                newRow.put(key, val != null ? val.toString() : null);
+            }
+            source2.add(newRow);
+        };
     }
 
     /**
@@ -446,8 +456,8 @@ class DbDiffHelper extends AbstractDiffHelper {
         skipMissedDb = (Boolean)params.get("skipMissedDb", skipMissedDb);
         ignoredValue = params.get("ignoredValue", ignoredValue).toString();
         includedNodes = (HashMap<String, String>)params.get("includedNodes", includedNodes);
-        modifications1 = (HashMap<String, String>)params.get("modifications1", modifications1);
-        modifications2 = (HashMap<String, String>)params.get("modifications2", modifications2);
+        _createModificators((HashMap<String, String>)params.get("modifications1"), modifications1);
+        _createModificators((HashMap<String, String>)params.get("modifications2"), modifications2);
     }
 
     /**
@@ -456,56 +466,75 @@ class DbDiffHelper extends AbstractDiffHelper {
      * Every time when called, overrides Diff and output Xml.
      */
     public void calcDiff(){
+        counter = 0;
+        _postProcessDbRows();
         outputList1 = new ArrayList<NodeChild>(source1);
         outputList2 = new ArrayList<HashMap<String, String>>(source2);
-        if(source2.size() > 0) {
-            for(int i = 0; i < source2.size(); i++){
-                for(int j = 0; j < includedNodes.keySet().size(); j++){
-                    String prefix = includedNodes.keySet()[j];
-                    String query = includedNodes.get(prefix, includedNodes.get(prefix.toUpperCase()));
-                    List<GroovyRowResult> subRows;
-                    if(subQueryFromFile){
-                        subRows = SqlUtil.executeFile(sql, query, source2[i])
-                    }else{
-                        subRows = SqlUtil.execute(sql, query, source2[i]);
-                    }
-
-                    _addSubRowsToParentRow(subRows, prefix, source2[i]);
-                }
-            }
-            Iterator<NodeChild> xmlIter = outputList1.listIterator();
-            Iterator<HashMap<String, String>> rowIter = outputList2.listIterator();
-            while(!(watchDog != null && watchDog()) && xmlIter.hasNext()){
-                NodeChild curXml = xmlIter.next();
-                if(orderlySafeMode){
-                    notified = false;
-                    if(rowIter.hasNext()){
-                        Map<String, String> curRow = new HashMap<String, String>(rowIter.next());
-                        if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
-                            xmlIter.remove();
-                            rowIter.remove();
-                        }
-                    }else{
-                        break;
+        total = Math.max(outputList1.size(), outputList2.size());
+        
+        Iterator<NodeChild> xmlIter = outputList1.listIterator();
+        Iterator<HashMap<String, String>> rowIter = outputList2.listIterator();
+        while(!(watchDog != null && watchDog()) && xmlIter.hasNext()){
+            counter++;
+            NodeChild curXml = xmlIter.next();
+            if(orderlySafeMode){
+                notified = false;
+                if(rowIter.hasNext()){
+                    Map<String, String> curRow = new HashMap<String, String>(rowIter.next());
+                    if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
+                        xmlIter.remove();
+                        rowIter.remove();
                     }
                 }else{
-                    Iterator<HashMap<String, String>> _rowIter = outputList2.listIterator();
-                    while(_rowIter.hasNext()){
-                        notified = false;
-                        if(_rowIter.hasNext()){
-                            Map<String, String> curRow = new HashMap<String, String>(_rowIter.next());
-                            if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
-                                xmlIter.remove();
-                                _rowIter.remove();
-                                break;
-                            }
-                        }else{
-                            break;
-                        }
+                    break;
+                }
+            }else{
+                Iterator<HashMap<String, String>> _rowIter = outputList2.listIterator();
+                while(_rowIter.hasNext()){
+                    notified = false;
+                    Map<String, String> curRow = new HashMap<String, String>(_rowIter.next());
+                    if(compareNodes(curXml, curRow) && _isCompleteMatch(curRow)){
+                        xmlIter.remove();
+                        _rowIter.remove();
+                        break;
                     }
                 }
             }
         }
+    }
+    
+    protected void _postProcessDbRows(){
+        for(int i = 0; i < source2.size(); i++){
+            for(int j = 0; j < includedNodes.keySet().size(); j++){
+                String prefix = includedNodes.keySet()[j];
+                String query = includedNodes.get(prefix, includedNodes.get(prefix.toUpperCase()));
+                List<GroovyRowResult> subRows;
+                if(subQueryFromFile){
+                    subRows = SqlUtil.executeFile(sql, query, (HashMap<String, String>)source2[i])
+                }else{
+                    subRows = SqlUtil.execute(sql, query, (HashMap<String, String>)source2[i]);
+                }
+
+                _addSubRowsToParentRow(subRows, prefix, (Map<String, Object>)source2[i]);
+            }
+        }
+    }
+
+    protected static Map<String, Object> _addSubRowsToParentRow(List<Map<String, String>> subRows, String prefix, Map<String, Object> row){
+        for(int i = 0; i < subRows.size(); i++){
+            Map<String, String> curRow = subRows[i]
+            for(int j = 0; j < curRow.keySet().size(); j++){
+                String curKey = curRow.keySet()[j];
+                List<String> keyParts = curKey.split("\\.");
+                String suffix = "";
+                for(int k = 1; k < keyParts.size(); k++){
+                    suffix += "." + keyParts[k];
+                }
+
+                row.put("${prefix}.${keyParts[0]}.>${i}${suffix}".toString(), curRow[curKey]);
+            }
+        }
+        return row;
     }
 
     /**
@@ -588,7 +617,7 @@ class DbDiffHelper extends AbstractDiffHelper {
 
             if((rowAttr == null && skipMissedDb) || (
                 Pattern.compile(ignoredValue).matcher(rowAttr != null ? rowAttr : "").find()
-                || _applyModifications(modifications1, rowAttrKey, rowAttr) == _applyModifications(modifications2, attrName, attrs.get(attrName).toString())
+                || _applyModifications(modifications1, rowAttrKey, rowCopy) == _applyModifications(modifications2, "@"+attrName, node)
             )){
                 attrsMatchCnt++;
                 row.remove(rowAttrKey);
@@ -617,7 +646,7 @@ class DbDiffHelper extends AbstractDiffHelper {
                     )
                 ) 
                 || Pattern.compile(ignoredValue).matcher(rowText != null ? rowText : "").find() 
-                || _applyModifications(modifications1, rowTextKey, rowText) == _applyModifications(modifications2, node.name(), _cleanNewLines(node.localText()[0]))
+                || _applyModifications(modifications1, rowTextKey, rowCopy) == _cleanNewLines(_applyModifications(modifications2, node.name(), node))
             ){
                 row.remove(rowTextKey);
                 int childrenCntMatch = 0;
@@ -650,29 +679,12 @@ class DbDiffHelper extends AbstractDiffHelper {
 
         return result;
     }
-    
-    protected static Map<String, Object> _addSubRowsToParentRow(List<Map<String, String>> subRows, String prefix, Map<String, Object> row){
-        for(int i = 0; i < subRows.size(); i++){
-            Map<String, String> curRow = subRows[i]
-            for(int j = 0; j < curRow.keySet().size(); j++){
-                String curKey = curRow.keySet()[j];
-                List<String> keyParts = curKey.split("\\.");
-                String suffix = "";
-                for(int k = 1; k < keyParts.size(); k++){
-                    suffix += "." + keyParts[k];
-                }
-
-                row.put("${prefix}.${keyParts[0]}.>${i}${suffix}".toString(), curRow[curKey]);
-            }
-        }
-        return row;
-    }
 
     private Boolean _isCompleteMatch(Map<String, String> shallowCopy){
         Boolean completeMatch = true;
         for(int c = 0; c < shallowCopy.size(); c++){
             String key = shallowCopy.keySet()[c];
-            if(!skipMissedXml && key.substring(0,1) != "_" && shallowCopy.get(key) != null && !Pattern.compile(ignoredValue).matcher(shallowCopy.get(key, "")).find()){
+            if(!skipMissedXml && !key.startsWith("_") && shallowCopy.get(key) != null && !Pattern.compile(ignoredValue).matcher(shallowCopy.get(key, "")).find()){
                 log.info "XML matches with DB result, but DB has NON NULL value (looks like XML is missing this node): {${shallowCopy.keySet()[c]} : '${shallowCopy.get(shallowCopy.keySet()[c])}'}";
 
                 completeMatch = false;
@@ -683,7 +695,7 @@ class DbDiffHelper extends AbstractDiffHelper {
     }
 
     private static String _cleanNewLines(String source){
-        if(source != null && source.substring(0,1) == "\n" && source.substring(source.size() - 1) == "\n"){
+        if(source != null && source.size() > 0 && source.substring(0,1) == "\n" && source.substring(source.size() - 1) == "\n"){
             source = source.substring(1);
             source = source.substring(0, source.size() - 1);
         }
